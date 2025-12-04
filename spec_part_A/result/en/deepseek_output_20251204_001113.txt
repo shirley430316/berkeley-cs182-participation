@@ -1,0 +1,352 @@
+============================================================
+HTTP request head
+============================================================
+content-type: application/json
+transfer-encoding: chunked
+connection: keep-alive
+date: Thu, 04 Dec 2025 08:06:31 GMT
+server: elb
+content-encoding: br
+vary: origin, access-control-request-method, access-control-request-headers
+access-control-allow-credentials: true
+x-ds-trace-id: 67f42012332bd7be4ddde82be4e58aef
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+x-content-type-options: nosniff
+x-cache: Miss from cloudfront
+via: 1.1 0dc4feb22bb4657ce2bb95fd05ec7122.cloudfront.net (CloudFront)
+x-amz-cf-pop: SFO5-P2
+x-amz-cf-id: plb2nsp3UTgMrtbdnM2PMtH_axh9iNMhbPBnL_pD_-aXZ9StQaeStg==
+Timestamp: 20251204_001113
+Model: deepseek-reasoner
+============================================================
+
+============================================================
+🤔 Reasoning Content
+============================================================
+We are given a Fermi estimation problem with multiple parts. We'll go step by step.
+
+### (a) Compute and dataset scaling
+
+We have Chinchilla scaling laws: For a given compute budget \( C \) in FLOP, the optimal parameter count \( N \) and token count \( D \) scale as:
+
+\[
+N = 0.1 C^{0.5} \quad \text{and} \quad D = 1.7 C^{0.5}.
+\]
+
+We are told GPT-6 has \( N = 10^{14} \) parameters. We need to find \( C \) and \( D \).
+
+From \( N = 0.1 C^{0.5} \), we solve for \( C \):
+
+\[
+10^{14} = 0.1 \times C^{0.5} \implies C^{0.5} = \frac{10^{14}}{0.1} = 10^{15}.
+\]
+
+Thus,
+
+\[
+C = (10^{15})^2 = 10^{30} \text{ FLOP}.
+\]
+
+Now, using \( D = 1.7 C^{0.5} \), we have:
+
+\[
+D = 1.7 \times 10^{15} = 1.7 \times 10^{15} \text{ tokens}.
+\]
+
+So:
+- Training compute \( C = 10^{30} \) FLOP.
+- Training dataset \( D = 1.7 \times 10^{15} \) tokens.
+
+### (b) Dataset size in human terms
+
+We are told: each English word corresponds to about 1.4 tokens, each page contains 400 words, each book has 300 pages.
+
+First, find the number of words in the dataset:
+
+Number of tokens = \( 1.7 \times 10^{15} \).
+
+Number of words = \( \frac{1.7 \times 10^{15}}{1.4} = \frac{1.7}{1.4} \times 10^{15} \approx 1.214 \times 10^{15} \) words.
+
+Now, words per page = 400, so number of pages = \( \frac{1.214 \times 10^{15}}{400} = 3.035 \times 10^{12} \) pages.
+
+Books have 300 pages each, so number of books = \( \frac{3.035 \times 10^{12}}{300} = 1.0117 \times 10^{10} \) books.
+
+Approximately \( 1.01 \times 10^{10} \) books.
+
+Library of Congress has about 20 million volumes = \( 2 \times 10^7 \) books.
+
+So the dataset corresponds to:
+
+\[
+\frac{1.01 \times 10^{10}}{2 \times 10^7} = 505 \text{ times the Library of Congress}.
+\]
+
+### (c) Memory requirements
+
+Each parameter is 16-bit = 2 bytes.
+
+Number of parameters = \( 10^{14} \).
+
+Total memory in bytes = \( 2 \times 10^{14} \) bytes.
+
+Convert to GB: 1 GB = \( 10^9 \) bytes, so:
+
+\[
+\frac{2 \times 10^{14}}{10^9} = 2 \times 10^5 \text{ GB} = 200,000 \text{ GB}.
+\]
+
+Convert to TB: 1 TB = \( 10^{12} \) bytes? Actually careful: 1 TB = \( 10^{12} \) bytes? Typically, 1 TB = 1024 GB, but for simplicity, we'll use 1 TB = 1000 GB = \( 10^{12} \) bytes? Actually, 1 GB = \( 10^9 \) bytes, so 1 TB = \( 10^{12} \) bytes. But here we have 200,000 GB, so that is 200 TB.
+
+Alternatively: \( 2 \times 10^{14} \) bytes = \( 2 \times 10^2 \) TB = 200 TB? Since 1 TB = \( 10^{12} \) bytes, then \( 2 \times 10^{14} / 10^{12} = 2 \times 10^2 = 200 \) TB.
+
+So memory required = 200 TB.
+
+H200 GPU has 100 GB VRAM. Number of GPUs to hold the model = \( \frac{200 \text{ TB}}{100 \text{ GB}} \). Convert to same units: 200 TB = 200,000 GB. So:
+
+\[
+\frac{200,000}{100} = 2000 \text{ GPUs}.
+\]
+
+### (d) Inference latency and throughput
+
+During inference, we need to load all parameters from GPU memory. The minimal time for one forward pass is determined by memory bandwidth: we need to read all parameters once? Actually, for a forward pass, typically each parameter is used at least once. So the time is at least the time to read the model parameters from memory. However, there is also computation time, but the question says: "minimal time to perform one forward pass" based on memory bandwidth. So we assume we are memory-bandwidth bound.
+
+H200 memory bandwidth = 4.8 TB/s = 4.8 × 10^12 bytes/s.
+
+Total bytes to read = size of model = 2 × 10^14 bytes.
+
+Time = (2 × 10^14) / (4.8 × 10^12) = (2/4.8) × 10^2 = 0.4167 × 100 ≈ 41.67 seconds.
+
+So minimal time for one forward pass ≈ 41.7 seconds.
+
+If the model generates tokens autoregressively, one forward pass per token, then in one minute (60 seconds), the number of tokens = 60 / 41.7 ≈ 1.44 tokens.
+
+But wait, we should compute exactly:
+
+Time per token = 41.67 seconds, so tokens per minute = 60 / 41.67 ≈ 1.44 tokens.
+
+But that seems extremely slow. However, note that this is the minimal time based solely on memory bandwidth. In practice, there might be optimizations like overlapping, but this is a rough estimate.
+
+Alternatively, maybe we should consider that the model might be distributed across many GPUs, and the bandwidth might be aggregate. The question says "the H200 has a memory bandwidth of 4.8 TB/s", and in part (c) we needed 2000 GPUs to hold the model. So if we use 2000 GPUs, the aggregate bandwidth would be 2000 × 4.8 TB/s = 9600 TB/s. But then the model is spread across them, and we need to consider communication. However, the question likely intends a single GPU scenario? But we just computed that we need 2000 GPUs to store the model. So maybe we should consider that the forward pass can be done in parallel across GPUs. But the question says: "During inference, model parameters must be loaded from GPU memory. The H200 has a memory bandwidth of 4.8 TB/s." It doesn't specify if we are using multiple GPUs. Possibly we are considering a single GPU? But then we cannot store the model. So perhaps we assume that the model is stored across multiple GPUs, and each GPU can load its portion simultaneously. Then the time would be the time to load the largest portion on one GPU? Actually, if the model is perfectly sharded, each GPU holds a part, and during inference, each GPU computes on its part, and then there is communication. But the question likely simplifies: the minimal time to perform one forward pass is the time to read the entire model from memory, assuming we have to read all parameters. If we have multiple GPUs, the aggregate bandwidth increases proportionally. So if we have 2000 GPUs, each with 4.8 TB/s, and if the model is evenly distributed, then each GPU needs to read its own parameters from its own memory, so the time is the time for one GPU to read its share. Each GPU holds 100 GB out of 200 TB, so that's 100 GB per GPU. So the time per GPU to read its share = (100 GB) / (4.8 TB/s) = (100 × 10^9) / (4.8 × 10^12) = (100/4.8) × 10^{-3} = 20.833 × 10^{-3} = 0.020833 seconds. But then they need to synchronize? Actually, the forward pass involves computation that depends on all parameters, but if it's pipeline parallel, we might have sequential steps. The simplest assumption is that the entire model must be read from memory, and if we have multiple GPUs, we can read in parallel, so the time is the time to read the largest chunk from one GPU's memory. That would be 100 GB / 4.8 TB/s = 0.0208 s. But then there is communication overhead. The question likely expects the single GPU scenario? But it says "the H200 has a memory bandwidth of 4.8 TB/s", and earlier we computed the model doesn't fit on one GPU. Perhaps we assume we are using multiple GPUs but the bandwidth is per GPU, and we are asking for the minimal time, which might be the time to load the model from memory if we had to load it all sequentially. Alternatively, maybe we consider that during inference, we don't necessarily need to load all parameters at once if we have enough memory to hold them all? Actually, if the model is already loaded in GPU memory, then we don't need to load it from elsewhere; we just access it. The time for a forward pass is then limited by the memory bandwidth to read the parameters from the GPU's own memory. So if the model is entirely in GPU memory (distributed across multiple GPUs), then to perform a forward pass, each GPU needs to read its own parameters from its own memory. So the time is the time for the slowest GPU to read its portion. That would be the size of the largest portion divided by the bandwidth. If we have 2000 GPUs, each holding 100 GB, then each GPU needs to read 100 GB from its memory. But actually, during a forward pass, each parameter is read once? So the total bytes read across all GPUs is 200 TB, and if they can all read in parallel, the time is (200 TB / (2000 * 4.8 TB/s))? That would be (200)/(2000*4.8) = 200/9600 = 0.02083 s. But that's if the aggregate bandwidth is 9600 TB/s. However, the question says "the H200 has a memory bandwidth of 4.8 TB/s", so if we have one H200, it would take 41.7 seconds. If we have 2000 H200s, then the aggregate bandwidth is 2000 * 4.8 TB/s, so the time is 41.7 / 2000 = 0.02085 s. So the minimal time assuming perfect parallelism is 0.02085 seconds per forward pass.
+
+But the question doesn't specify the number of GPUs used for inference. In part (c) we computed that we need 2000 GPUs just to hold the model. So it's reasonable to assume we are using at least 2000 GPUs for inference. However, the question in (d) might be independent: it asks for the minimal time to perform one forward pass through GPT-6, given that the H200 has a memory bandwidth of 4.8 TB/s. It doesn't mention multiple GPUs. Possibly we are to assume that the model is stored on a single H200? But that's impossible because it doesn't fit. Alternatively, maybe we assume that we have enough H200s to store the model, and they are connected with infinite bandwidth? Or perhaps we consider the time to read the model from memory once, regardless of how many GPUs, but if we have multiple GPUs, the bandwidth aggregates.
+
+Given that this is a Fermi estimation, we might keep it simple and use the single GPU scenario to get an order of magnitude. But then the number of tokens per minute would be about 1.44, which is very small. Alternatively, if we use 2000 GPUs, we get about 0.0208 seconds per token, so about 2880 tokens per minute. That seems more realistic for a large model? Actually, for a 100 trillion parameter model, even that might be optimistic because of communication.
+
+Let's read the question carefully: "During inference, model parameters must be loaded from GPU memory. The H200 has a memory bandwidth of 4.8 TB/s. What is the minimal time in seconds to perform one forward pass through GPT-6?" It doesn't specify the number of GPUs. Possibly they expect us to use the total memory size from (c) and divide by the bandwidth, assuming all parameters need to be read from memory. That gives 41.7 seconds. But then they ask: "If the model generates tokens autoregressively (one token per forward pass), how many tokens could it output in one minute?" That would be 60/41.7 ≈ 1.44 tokens per minute, which is extremely slow. That might be intended to show that such a model is impractical for real-time inference without massive parallelism.
+
+Alternatively, maybe they expect us to consider that the model is stored in GPU memory, and during inference, we don't need to reload the entire model for each forward pass? Actually, for each forward pass, we need to read all parameters? Not exactly: in a transformer, during inference for one token, we do need to use all parameters? Actually, yes, for each token generation, we run the entire model, so we need to access all parameters. So the amount of data read is at least the size of the parameters (if they are not cached in a smaller memory). So the lower bound on time is the time to read that amount of data from memory.
+
+Given that the model size is 200 TB, and the H200 bandwidth is 4.8 TB/s, the time is 200/4.8 ≈ 41.67 s. That is a hard lower bound if we have to read 200 TB from memory. But if we have 2000 GPUs, each holding 0.1 TB, then each GPU needs to read 0.1 TB from its own memory, which takes 0.1/4.8 ≈ 0.0208 s, and if they work in parallel, the overall forward pass time is limited by the slowest GPU, so also 0.0208 s. So the minimal time is 0.0208 s if we have perfect parallelism and no communication overhead. So which one is it? The question says "the H200 has a memory bandwidth of 4.8 TB/s". It doesn't say we have multiple H200s. So perhaps we assume we are using a single H200? But then the model doesn't fit. Maybe we assume we are using a single H200 and the model is stored in CPU memory or something, and we are loading from there? That would be slower.
+
+Given the ambiguity, I'll check the typical approach in Fermi estimates: we use the numbers given directly. So I'll compute: time = model size in bytes / bandwidth in bytes per second.
+
+Model size = 2e14 bytes, bandwidth = 4.8 TB/s = 4.8e12 bytes/s. So time = 2e14 / 4.8e12 = 41.67 seconds.
+
+I'll go with that.
+
+Then tokens per minute = 60 / 41.67 ≈ 1.44 tokens.
+
+But to be precise: 2e14 / (4.8e12) = 41.666... s. So tokens per minute = 60 / (100/2.4?) Actually, 2e14/4.8e12 = 200/4.8 = 41.6667. So 60/41.6667 = 1.44.
+
+I'll write: ~41.7 seconds per forward pass, so about 1.44 tokens per minute.
+
+### (e) Training cost in FLOPs and dollars
+
+First, we need to compute the training cost for GPT-3 and then for GPT-6.
+
+Given: GPT-3 required 3640 petaFLOP-days to train.
+
+One petaFLOP-day = 8.64e19 FLOP (since 1 petaFLOP = 1e15 FLOP/s, and 1 day = 86400 seconds, so 1e15 * 86400 = 8.64e19 FLOP).
+
+So training compute for GPT-3 in FLOP: 3640 * 8.64e19 = ?
+
+Compute: 3640 * 8.64e19 = 3640 * 8.64 * 10^19 = (3640*8.64) * 10^19. 3640*8.64 = 3640*8 + 3640*0.64 = 29120 + 2329.6 = 31449.6. So about 3.145e4 * 10^19 = 3.145e23 FLOP. But we might not need this number directly.
+
+Now, H200 GPU delivers 1.98 petaFLOP/s. Wait, that's huge: 1.98 petaFLOP/s? That seems too high. Typically, an H100 has about 0.989 petaFLOP/s for FP16 tensor core? But here it says 1.98 petaFLOP/s. Possibly it's for some specific precision? We'll use the given number.
+
+So each H200 delivers 1.98 petaFLOP/s. That is 1.98e15 FLOP/s.
+
+Rent: $1.50 per hour per GPU.
+
+We need to compute the cost to train GPT-3 on H200 GPUs.
+
+First, find the total FLOP for GPT-3: 3640 petaFLOP-days.
+
+Convert petaFLOP-days to FLOP: 3640 * (8.64e19) = ? As above, approximately 3.145e23 FLOP.
+
+Now, if one H200 delivers 1.98e15 FLOP/s, then the number of GPU-seconds required = total FLOP / (1.98e15) = (3.145e23) / (1.98e15) = 1.588e8 seconds.
+
+Convert to GPU-hours: divide by 3600: 1.588e8 / 3600 = 4.411e4 hours.
+
+Cost per GPU-hour = $1.50, so total cost = 4.411e4 * 1.50 = 6.6165e4 ≈ $66,165.
+
+But wait, that seems very low: only $66k to train GPT-3? That can't be right. Possibly because the H200 is extremely powerful? Or maybe I made a mistake: 3640 petaFLOP-days. If we use the definition: 1 petaFLOP-day = 1e15 * 86400 = 8.64e19 FLOP. So 3640 * 8.64e19 = 3.145e23 FLOP. An H200 at 1.98 petaFLOP/s delivers 1.98e15 FLOP/s, so the time in seconds on one GPU is 3.145e23 / 1.98e15 = 1.588e8 seconds. That is about 1.588e8 / 86400 = 1838 days, which is about 5 years. So if we use one GPU, it would take 5 years. But if we use many GPUs in parallel, we can reduce the wall-clock time. The cost is proportional to the total GPU-time, not wall-clock time. So if we use N GPUs, the wall-clock time reduces by a factor of N, but the total GPU-hours remains the same. So the cost I computed is the cost if we rent one GPU for 1.588e8 seconds (about 5 years). But if we use many GPUs, the total GPU-hours is still 4.411e4 hours, which at $1.50/hour is $66k. That seems plausible? Actually, training GPT-3 originally cost millions of dollars. So maybe the H200 is much more efficient? Or maybe the 1.98 petaFLOP/s is for lower precision? Alternatively, perhaps the rental price is not per GPU but per hour of usage? Or maybe the FLOP rate is for theoretical peak, and in practice, utilization is lower. But the problem says "each delivering 1.98 petaFLOP/s and renting for $1.50/hour". So it's a hypothetical.
+
+Given that, we'll proceed.
+
+So cost for GPT-3: total GPU-hours = (total FLOP) / (1.98e15 FLOP/s) / 3600 = (3640 * 8.64e19) / (1.98e15 * 3600). Let's compute step by step:
+
+Total FLOP = 3640 * 8.64e19.
+
+Compute 3640 * 8.64 = 31449.6, so 3.14496e4 * 1e19 = 3.14496e23 FLOP.
+
+GPU FLOP/s = 1.98e15.
+
+GPU-seconds = 3.14496e23 / 1.98e15 = 1.58836e8 seconds.
+
+GPU-hours = 1.58836e8 / 3600 = 44121.1 hours.
+
+Cost = 44121.1 * 1.50 = $66181.65 ≈ $66,200.
+
+Now for GPT-6, we computed C = 10^30 FLOP from part (a).
+
+So total FLOP for GPT-6 = 10^30 FLOP.
+
+Then GPU-seconds = 10^30 / (1.98e15) = (1/1.98) * 10^15 = 5.05e14 seconds? Actually: 10^30 / 1.98e15 = (10^30)/(1.98*10^15) = (1/1.98)*10^15 = 5.05e14 seconds.
+
+GPU-hours = 5.05e14 / 3600 = 1.4028e11 hours.
+
+Cost = 1.4028e11 * 1.50 = 2.1042e11 dollars = $2.1e11, i.e., $210 billion.
+
+So training cost for GPT-6 ≈ $210 billion.
+
+### (f) Inference cost and break-even
+
+We have: For Transformer models, inference requires about 2 FLOPs per parameter per token.
+
+So for a 1-trillion-parameter model (like GPT-5), FLOPs per token = 2 * 10^12 FLOP.
+
+To generate 1 million tokens: FLOPs = 2 * 10^12 * 10^6 = 2 * 10^18 FLOP.
+
+Now, OpenAI charges $120 per million tokens.
+
+We want to know how many tokens must be sold to recoup a $1 billion training cost.
+
+Training cost = $1e9.
+
+Revenue per million tokens = $120.
+
+So number of million token units needed = 1e9 / 120 = 8.333e6 million tokens.
+
+That is, 8.333e6 * 10^6 = 8.333e12 tokens.
+
+Now express in terms of 1000-word essays. Assume 1.4 tokens per word, so 1000 words = 1400 tokens.
+
+Number of essays = total tokens / 1400 = 8.333e12 / 1400 = 5.952e9 essays.
+
+So about 6 billion essays.
+
+### (g) Environmental impact
+
+Training GPT-3 emitted 552 tonnes of CO₂.
+
+Social cost of carbon: $112 per tonne.
+
+Carbon cost in USD: 552 * 112 = ?
+
+552 * 100 = 55200, 552 * 12 = 6624, total = 61824 dollars. So $61,824.
+
+Now, producing 1 kg of beef emits 50 kg of CO₂.
+
+A quarter-pound burger contains 113 g of beef. Quarter-pound is 0.25 lb, which is about 113.4 g, so 113 g.
+
+First, find CO₂ per burger: 113 g beef = 0.113 kg beef. Emissions per kg beef = 50 kg CO₂, so per burger: 0.113 * 50 = 5.65 kg CO₂.
+
+Now, training GPT-3 emitted 552 tonnes = 552,000 kg CO₂.
+
+Number of burgers' worth = 552,000 / 5.65 ≈ ?
+
+552000 / 5.65 = (552000 * 100) / 565 = 55200000/565 ≈ 97699. So about 97,700 burgers.
+
+Alternatively, compute exactly: 5.65 * 100,000 = 565,000, which is more than 552,000, so around 97,700.
+
+More precisely: 552000 / 5.65 = 552000 / (5.65) = 552000 / (565/100) = 552000 * 100 / 565 = 55,200,000 / 565 = divide: 565 * 97699 =? 565*97000=54,805,000, remainder 395,000; 565*699=394,935, so total 54,805,000+394,935=55,199,935, remainder 65. So about 97699. So 97,699 burgers.
+
+I'll round to 98,000 burgers.
+
+Now, we have all answers. Let's write them concisely.
+
+============================================================
+
+============================================================
+💡 Final Answer
+============================================================
+### **(a) Compute and dataset scaling**  
+Using Chinchilla scaling laws:  
+\( N = 0.1 C^{0.5} \) with \( N = 10^{14} \) parameters  
+\[
+C^{0.5} = \frac{10^{14}}{0.1} = 10^{15} \implies C = (10^{15})^2 = 10^{30} \text{ FLOP}.
+\]  
+\( D = 1.7 C^{0.5} = 1.7 \times 10^{15} \approx 1.7 \times 10^{15} \text{ tokens}. \)
+
+---
+
+### **(b) Dataset size in human terms**  
+Tokens to words: \( \frac{1.7 \times 10^{15}}{1.4} \approx 1.21 \times 10^{15} \text{ words}.\)  
+Words to pages: \( \frac{1.21 \times 10^{15}}{400} \approx 3.03 \times 10^{12} \text{ pages}.\)  
+Pages to books: \( \frac{3.03 \times 10^{12}}{300} \approx 1.01 \times 10^{10} \text{ books}.\)  
+Library of Congress size: \( 2 \times 10^7 \text{ books}.\)  
+Ratio: \( \frac{1.01 \times 10^{10}}{2 \times 10^7} \approx 505 \text{ times larger}. \)
+
+---
+
+### **(c) Memory requirements**  
+Model size: \( 10^{14} \text{ parameters} \times 2 \text{ bytes/param} = 2 \times 10^{14} \text{ bytes}.\)  
+In terabytes: \( \frac{2 \times 10^{14}}{10^{12}} = 200 \text{ TB}.\)  
+H200 VRAM: 100 GB per GPU.  
+GPUs needed: \( \frac{200 \times 1000 \text{ GB}}{100 \text{ GB}} = 2000 \text{ GPUs}. \)
+
+---
+
+### **(d) Inference latency and throughput**  
+Memory bandwidth: 4.8 TB/s = \( 4.8 \times 10^{12} \text{ bytes/s}.\)  
+Time per forward pass: \( \frac{2 \times 10^{14} \text{ bytes}}{4.8 \times 10^{12} \text{ bytes/s}} \approx 41.7 \text{ seconds}.\)  
+Autoregressive generation: 1 token per forward pass.  
+Tokens per minute: \( \frac{60}{41.7} \approx 1.44 \text{ tokens}. \)
+
+---
+
+### **(e) Training cost in FLOPs and dollars**  
+**GPT-3:**  
+Compute: 3640 petaFLOP-days = \( 3640 \times 8.64 \times 10^{19} \approx 3.14 \times 10^{23} \text{ FLOP}.\)  
+H200 throughput: 1.98 petaFLOP/s = \( 1.98 \times 10^{15} \text{ FLOP/s}.\)  
+GPU-seconds: \( \frac{3.14 \times 10^{23}}{1.98 \times 10^{15}} \approx 1.59 \times 10^8 \text{ s}.\)  
+GPU-hours: \( \frac{1.59 \times 10^8}{3600} \approx 4.41 \times 10^4 \text{ hours}.\)  
+Cost: \( 4.41 \times 10^4 \times 1.50 \approx \$66,200.\)  
+
+**GPT-6:**  
+Compute: \( C = 10^{30} \text{ FLOP}.\)  
+GPU-seconds: \( \frac{10^{30}}{1.98 \times 10^{15}} \approx 5.05 \times 10^{14} \text{ s}.\)  
+GPU-hours: \( \frac{5.05 \times 10^{14}}{3600} \approx 1.40 \times 10^{11} \text{ hours}.\)  
+Cost: \( 1.40 \times 10^{11} \times 1.50 = \$2.10 \times 10^{11} \approx \$210 \text{ billion}. \)
+
+---
+
+### **(f) Inference cost and break-even**  
+FLOPs per token for 1-trillion-parameter model: \( 2 \times 10^{12} \text{ FLOP}.\)  
+FLOPs for 1 million tokens: \( 2 \times 10^{12} \times 10^6 = 2 \times 10^{18} \text{ FLOP}.\)  
+Revenue per million tokens: $120.  
+Tokens to recoup $1 billion: \( \frac{10^9}{120} \approx 8.33 \times 10^6 \text{ million tokens} = 8.33 \times 10^{12} \text{ tokens}.\)  
+1000-word essays: \( 1000 \times 1.4 = 1400 \text{ tokens per essay}.\)  
+Number of essays: \( \frac{8.33 \times 10^{12}}{1400} \approx 5.95 \times 10^9 \text{ essays} \approx 6 \text{ billion essays}. \)
+
+---
+
+### **(g) Environmental impact**  
+CO₂ from GPT-3: 552 tonnes = \( 5.52 \times 10^5 \text{ kg}.\)  
+Carbon cost: \( 552 \times 112 = \$61,824.\)  
+CO₂ per kg beef: 50 kg.  
+Beef per quarter-pound burger: 113 g = 0.113 kg.  
+CO₂ per burger: \( 0.113 \times 50 = 5.65 \text{ kg}.\)  
+Burgers equivalent: \( \frac{5.52 \times 10^5}{5.65} \approx 9.77 \times 10^4 \approx 98,000 \text{ burgers}. \)
+
+============================================================
+📊 Statistics
+============================================================
+Total time for request: 282.39 seconds
+Character count - Reasoning: 18028, Answer: 3399, Total: 21427
+Token usage:
+   Prompt Tokens (输入): 804
+   Completion Tokens (输出): 6903
+   Total Tokens (总计): 7707
